@@ -1,0 +1,211 @@
+<!DOCTYPE html><html><head>
+<script src="https://code.jquery.com/jquery-2.1.4.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.15.0/vis.min.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.15.0/vis.min.css" rel="stylesheet" type="text/css" />
+<meta charset="utf-8"><title>CS461 HW1</title><style type="text/css">
+#tre {
+	width: 1100px;
+	height: 600px;
+	border: 1px solid lightgray;
+}
+</style></head><body>
+<div>Node format: missionaries on left, cannibals on left, boat position (zero = left)</div><br>
+<button id="b_opt" type="button">Run optimum search</button>
+<button id="b_stu" type="button">Run 10 stupid search (no drawing)</button>
+<button id="b_stud" type="button">! Run stupid search ! (takes ~1 min)</button>
+<br><br>
+<div id="res"></div><div id="tre"></div><script>
+
+function draw(b) {
+	dd = [];
+	ee = [];
+	dd.push({id: 0, label: root.data.toString().substr(1)});
+	drawt(root, 0);
+	if (b) {
+		var tre = new vis.Network(document.getElementById("tre"), {nodes: new vis.DataSet(dd), edges: new vis.DataSet(ee)}, {layout: {hierarchical: {sortMethod: "directed", direction: "UD", levelSeparation:100000, nodeSpacing:1000}}, physics: false});
+	} else {
+		var tre = new vis.Network(document.getElementById("tre"), {nodes: new vis.DataSet(dd), edges: new vis.DataSet(ee)}, {layout: {hierarchical: {sortMethod: "directed", direction: "UD"}}})
+	};
+}
+
+function drawt(node, parent) {
+	for (var i = 0; i < node.children.length; i++) {
+		dd.push({id: node.children[i].id, label: node.children[i].data.toString().substr(1)});
+		ee.push({from: parent, to: node.children[i].id});
+		drawt(node.children[i], node.children[i].id);
+	}
+}
+
+function shuf(a) {
+	for (var i = (a.length - 1); i > 0; i--) {
+		var j = Math.floor(Math.random() * (i + 1));
+		var te = a[i];
+		a[i] = a[j];
+		a[j] = te;
+	}
+	return a;
+}
+
+function dig(numm) {
+	var num = (numm - 1000);
+	return [(Math.floor(num / 100) % 10), (Math.floor(num / 10) % 10), (num % 10)];
+}
+
+function pos(num) {
+	var d = dig(num);
+	return parseInt((zero(d[0].toString(2)).toString() + zero(d[1].toString(2)).toString() + d[2]), 2).toString(10);
+}
+
+function zero(l) {
+	if (l.length == 1) {
+		return ("0" + l);
+	}
+	return l;
+}
+
+function level(node) {
+	var go = 0;
+	var cur = node;
+	while (cur) {
+		cur = cur.parent;
+		go ++;
+	}
+	return go;
+}
+
+function Node(data, parent) {
+	this.data = data;
+	this.parent = parent;
+	this.children = [];
+	this.id = node_id++;
+}
+
+function add(to, opti) {
+	var fou = 0;
+	var d = dig(to.data);
+	if (d[2]) {
+		var order = [];
+		for (var i = 0; i <= (3 - d[0]); i++) {
+			for (var j = 0; j <= (3 - d[1]); j++) {
+				if (((i >= j) || (i == 0)) && (((3 - i) >= (3 - j)) || ((3 - i) == 0)) && (((3 - d[0] - i + 3 - d[1] - j) == 1) || ((3 - d[0] - i + 3 - d[1] - j) == 2))) {
+					order.push([i, j]);
+				}
+			}
+		}
+		shuf(order);
+		var o = order.shift();
+		while (o) {
+			var i = o[0];
+			var j = o[1];
+			var go = parseInt("1" + (3 - i).toString() + (3 - j).toString() + "0");
+			var oldlev = all[pos(go)];
+			var curlev = level(to);
+			var add = 0;
+			if (opti == 1) {
+				if ((oldlev == -1) || (curlev < oldlev)) {
+					add = 1;
+				}
+			} else {
+				add = 1;
+			}
+			if (add) {
+				all[pos(go)] = (curlev + 1);
+				to.children.push(new Node(go, to));
+			}
+			o = order.shift();
+		}
+	} else {
+		var order = [];
+		for (var i = 0; i <= d[0]; i++) {
+			for (var j = 0; j <= d[1]; j++) {
+				if (((i >= j) || (i == 0)) && (((3 - i) >= (3 - j)) || ((3 - i) == 0)) && (((d[0] - i + d[1] - j) == 1) || ((d[0] - i + d[1] - j) == 2))) {
+					order.push([i, j]);
+				}
+			}
+		}
+		shuf(order);
+		var o = order.shift();
+		while (o) {
+			var i = o[0];
+			var j = o[1];
+			var go = parseInt("1" + i.toString() + j.toString() + "1");
+			var oldlev = all[pos(go)];
+			var curlev = level(to);
+			var add = 0;
+			if (opti == 1) {
+				if ((oldlev == -1) || (curlev < oldlev)) {
+					add = 1;
+				}
+			} else {
+				add = 1;
+			}
+			if (add) {
+				all[pos(go)] = (curlev + 1);
+				to.children.push(new Node(go, to));
+			}
+			o = order.shift();
+		}
+	}
+}
+
+var root;
+var node_id;
+var all;
+var dd;
+var ee;
+
+function run(opti) {
+	node_id = 0;
+	all = new Array(32);
+	for (var i = 0; i < all.length; i++) {
+		all[i] = -1;
+	}
+	all[pos(1330)] = 0;
+	root = new Node(1330, null);
+	var queue = [];
+	queue.push(root);
+	curno = queue.shift();
+	while(curno) {
+		if (opti == 1) {
+			if (curno.data != "1001") {
+				add(curno, opti);
+			}
+		} else {
+			if ((curno.data == "1001") && (level(curno) == 12)) {
+				return true;
+			} else {
+				add(curno, opti);
+			}
+		}
+		for (var i = 0, length = curno.children.length; i < length; i++) {
+			queue.push(curno.children[i]);
+		}
+		curno = queue.shift();
+	}
+	return false;
+}
+
+$("#b_opt").click(function() {
+	run(1);
+	draw(0);
+	$("#res").html("Optimized search reached equally long 4 different solutions after " + node_id + " node creations.<br><br>");
+});
+
+$("#b_stud").click(function() {
+	run(0);
+	draw(1);
+	$("#res").html("Blind search reached equally long 4 different solutions after " + node_id + " node creations.<br><br>");
+});
+
+$("#b_stu").click(function() {
+	var resu = [];
+	for (var i = 0; i < 10; i++) {
+		if (!run(0)) {
+			$("body").html("error");
+		}
+		resu.push(node_id);
+	}
+	$("#res").html("Number of node creations to reach goal:<br>" + resu.join("<br>") + "<br><br>");
+});
+
+</script></body></html>
